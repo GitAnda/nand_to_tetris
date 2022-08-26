@@ -1,0 +1,6 @@
+*.tst binary
+*.hdl binary
+*.sh binary
+*.bat binary
+*.cmp binary
+*.out binary
