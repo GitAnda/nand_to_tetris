@@ -11,4 +11,52 @@
 // "white" in every pixel;
 // the screen should remain fully clear as long as no key is pressed.
 
-// Put your code here.
+(START)
+
+// get KBD and initialise screen output value
+@KBD
+D=M
+@value
+M=0
+
+// set screen value to black if KBD is not zero
+@KBD_IS_ZERO
+D;JEQ
+@value
+M=-1
+(KBD_IS_ZERO)
+
+// initialise index and address
+@count
+M=0
+@SCREEN
+D=A
+@address
+M=D
+
+// loop over the screen registers and set all to value
+(LOOP)
+@value
+D=M
+@address
+A=M
+M=D
+
+// increase address and count by 1
+@address
+M=M+1
+@count
+M=M+1
+
+// jump to start if count is equal to 8192
+@8192
+D=A
+@count
+D=D-M
+@START
+D;JEQ
+
+@LOOP
+0;JMP
+
+

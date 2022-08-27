@@ -9,4 +9,38 @@
 // This program only needs to handle arguments that satisfy
 // R0 >= 0, R1 >= 0, and R0*R1 < 32768.
 
-// Put your code here.
+// initialise R2 0
+@R2
+M=0
+
+// count = R1
+@R1
+D=M
+@count
+M=D
+
+(LOOP)
+// check if count is equal to 0
+@count
+D=M
+@END
+D;JEQ
+
+// add R0 to R2
+@R0
+D=M
+@R2
+M=M+D
+
+// decrease count by 1
+@count
+M=M-1
+
+// return to start of loop
+@LOOP
+0;JMP
+
+// end of program
+(END)
+@END
+0;JMP
