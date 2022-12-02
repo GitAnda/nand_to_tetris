@@ -1,85 +1,88 @@
 from argparse import ArgumentParser
 from pathlib import Path
 import re
+import json
 
 
 class HackAssembler():
     def __init__(self, path: Path):
         self.path = path
-
-        self.register_symbols = {f'R{i}': i for i in range(16)}
-        self.available_register = 16
+        
+        with open('symbols.json') as f:
+            self.symbols = json.load(f)
         self.jump_symbols = dict()
-        self.instructions = self.set_instructions()
+        self.instructions = self.get_instructions(path)
+        self.find_symbols()
 
-        with open('comp') as f:
-            self.lookup_comp = {}
-            for line in f.readlines():
-                s, b = line.strip().split(' ')
-                self.lookup_comp[s] = b
-        with open('jump') as f:
-            self.lookup_jump = {}
-            for line in f.readlines():
-                s, b = line.strip().split(' ')
-                self.lookup_jump[s] = b
+        with open('comp.json') as f:
+            self.comp = json.load(f)
+        with open('jump.json') as f:
+            self.jump = json.load(f)
 
-        self.machine_code = self.get_machine_code()
-
-    @staticmethod
-    def split_c_instruction(str_instruction):
-        res = re.split('=|;', str_instruction)
-        if '=' not in str_instruction:
+    def c_instruction(self, str_instr):
+        res = re.split('=|;', str_instr)
+        if '=' not in str_instr:
             res.insert(0, 'null')
-        if ';' not in str_instruction:
+        if ';' not in str_instr:
             res.append('null')
-        return res
+        
+        d, c, j = res
+        d, c, j = f"{int('A' in d)}{int('D' in d)}{int('M' in d)}", self.comp[c], self.jump[j]
+        return f'111{c}{d}{j}'
+    
+    def a_instruction(self, str_instr):
+        v = str_instr[1:]
+        if v.isnumeric():
+            code = f'0{int(v):15b}'
+        else:
+            code = f'0{self.symbols[v]:15b}'
+        return code.replace(' ', '0')
     
     def get_machine_code(self):
-        code = []
-        for instruction in self.instructions:
-            if instruction[0] == '@':
-                v = self.register_symbols[instruction[1:]]
-                machine_code = f'0{v:15x}'.replace(' ', '0')
-
+        machine_code = []
+        for instr in self.instructions:
+            if instr[0] == '@':
+                code = self.a_instruction(instr)
             else:
-                d, c, j = self.split_c_instruction(instruction)
-                c = self.lookup_comp[c]
-                d = f"{int('A' in d)}{int('D' in d)}{int('M' in d)}"
-                j = self.lookup_jump[j]
-                machine_code = f'111{c}{d}{j}'
-                print(instruction, machine_code)
-            code.append(machine_code)
-        return code
+                code = self.c_instruction(instr)
+            machine_code.append(code)
+        return machine_code
 
-    def find_next_register(self):
-        while self.available_register in self.register_symbols.values():
-            self.available_register += 1
+    def find_next_register(self, address):
+        while address in self.symbols.values():
+            address += 1
+        return address
         
-    def set_instructions(self):
+    def get_instructions(self, path):
         instructions = []
         count = 0
         with open(self.path, 'r') as f:
             for line in f.readlines():
+                line = line.split('//')[0]
                 line = line.strip().replace(' ', '')
-                if not line or line[:2] == '//':
+                if not line:
                     continue
 
                 if line[0] == '(' and line[-1] == ')':
                     self.jump_symbols[line[1:-1]] = count
                     continue
-
-                if line[0] == '@':
-                    v = line[1:]
-                    if not v in self.register_symbols:
-                        if v.isnumeric():
-                            self.register_symbols[v] = int(v)
-                        else:
-                            self.register_symbols[v] = self.available_register
-                            self.find_next_register()
-
+                
                 instructions.append(line)
                 count += 1
+            
         return instructions
+    
+    def find_symbols(self):
+        next_addr = 16
+        for instr in self.instructions:
+            if instr[0] == '@':
+                
+                v = instr[1:]
+                if v not in self.symbols and v not in self.jump_symbols:
+                    if not v.isnumeric():
+                        self.symbols[v] = next_addr
+                        next_addr = self.find_next_register(next_addr)
+        self.symbols.update(self.jump_symbols)
 
 
 
@@ -89,9 +92,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     assembler = HackAssembler(args.path)
-
-    # for s, b in zip(assembler.instructions, assembler.machine_code):
-    #     print(f"{s}, {b}")
+    machine_code = assembler.get_machine_code()
+    
+    with open(Path(args.path.stem + '.hack'), 'w') as f:
+        f.write('\n'.join(machine_code))
+        
 
     exit(0)
 
